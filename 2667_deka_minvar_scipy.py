@@ -19,7 +19,8 @@ def port_var(w):
 
 ind_max=0.2
 co_max=0.2
-w_max=0.045
+w_max=0.08
+w_ucits = 0.38
 
 dfd = pd.read_csv(dkf.dloc + '03_Deka_Europe_Multi_Factor_adtv_v2.csv', sep=';')
 dfd['Date'] = pd.to_datetime(dfd['Date'], format='%d.%m.%Y', dayfirst=True)
@@ -54,7 +55,7 @@ for d in dfd['Date'].drop_duplicates():
         industryidx.append(dfcomp[dfcomp.ICB_ind == i]['isin'].index)
 
     for ind in range(len(industryidx)):
-        con = {'type': 'ineq', 'fun': lambda w, ind=ind: sum(w[industryidx[ind]]) - ind_max}
+        con = {'type': 'ineq', 'fun': lambda w, ind=ind: ind_max - sum(w[industryidx[ind]])}
         cons = np.append(cons, con)
 
     # country constraint
@@ -63,9 +64,11 @@ for d in dfd['Date'].drop_duplicates():
         countryidx.append(dfcomp[dfcomp.country == co]['isin'].index)
 
     for cntry in range(len(countryidx)):
-        con = {'type': 'ineq', 'fun': lambda w, cntry=cntry: sum(w[countryidx[cntry]]) - co_max}
+        con = {'type': 'ineq', 'fun': lambda w, cntry=cntry: co_max - sum(w[countryidx[cntry]])}
         cons = np.append(cons, con)
 
+    #ucits constraint
+    cons = np.append(cons, {'type': 'ineq', 'fun': lambda w: w_ucits-sum(w[w>0.045])})
     w0 = np.ones(n) / n
 
     optiwgts = minimize(port_var, w0, method='SLSQP', bounds=b_, constraints=cons)
@@ -74,12 +77,14 @@ for d in dfd['Date'].drop_duplicates():
     dfcomp.loc[dfcomp[dfcomp.weight < 1e-06].index, 'weight'] = 0
 
 
-print('pf var - opti weight:', np.dot(optiwgts.x, np.dot(covs,optiwgts.x)))
-print('pf var - equal weight:', np.dot(w0, np.dot(covs,w0)))
-#dfcomp.groupby('ICB_ind_name').sum()['weight'].sort_values(ascending=False)
-#dfcomp.groupby('country').sum()['weight'].sort_values(ascending=False)
-#dfcomp.loc[dfcomp[dfcomp.weight!=0].index, 'weight'].sort_values(ascending=False)
-#dfcomp.loc[dfcomp[dfcomp.weight>0.045].index, 'weight'].sum()
+    pfvar_opti = np.dot(optiwgts.x, np.dot(covs,optiwgts.x))
+    pfvar_ew = np.dot(w0, np.dot(covs,w0))
+    print 'pf var - opti weight:', pfvar_opti, np.sqrt(pfvar_opti)
+    print 'pf var - equal weight:', pfvar_ew, np.sqrt(pfvar_ew)
+    print dfcomp.groupby('ICB_ind_name').sum()['weight'].sort_values(ascending=False)
+    print dfcomp.groupby('country').sum()['weight'].sort_values(ascending=False).head()
+    print dfcomp.loc[dfcomp[dfcomp.weight!=0].index, 'weight'].sort_values(ascending=False).head(10)
+    print optiwgts.x[optiwgts.x>0.045].sum(), 'sum ucits'
 
 import matplotlib.pyplot as plt
 # the histogram of the data
