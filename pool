@@ -1,0 +1,5 @@
+        from multiprocessing import Pool
+        
+        with Pool(processes=None) as pool:          # multicore
+             res = pool.starmap(Lasso_cl.lasso_shuffle,[(self, df1.loc[df1[self.grp[0]] == gkey]) for gkey in grps])
+        coef_df = pd.concat(res)
